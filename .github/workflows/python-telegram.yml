@@ -16,7 +16,7 @@ jobs:
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
             ${{ github.actor }} created a release:
-            Release branch: ${{ GITHUB_REF_NAME }}
+            Release branch: ${ GITHUB_REF_NAME }
 
             Repository: ${{ github.repository }}
 
