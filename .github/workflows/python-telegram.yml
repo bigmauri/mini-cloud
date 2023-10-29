@@ -2,7 +2,7 @@ name: Telegram Message
 on:
   push:
     branches:
-      - develop
+      - 'release/**'
 jobs:
 
   build:
