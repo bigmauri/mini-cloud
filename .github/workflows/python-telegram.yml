@@ -18,6 +18,6 @@ jobs:
             ${{ github.actor }} created a release:
             Release branch: **${{ github.ref_name }}**
 
-            Repository: ${{ github.repository }}
+            Repository: **${{ github.repository }}**
 
             See last commit: https://github.com/${{ github.repository }}/commit/${{github.sha}}
