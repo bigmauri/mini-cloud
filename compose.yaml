@@ -1,6 +1,8 @@
 version: '3.8'
 
 services:
+  
+  # registry services - [home-registry - subnet]
   registry-ui:
     image: joxit/docker-registry-ui:main
     restart: always
@@ -21,7 +23,6 @@ services:
     container_name: registry-ui
     networks:
       - home-registry
-
   registry-server:
     image: registry:2.8.2
     restart: always
@@ -40,5 +41,29 @@ services:
     networks:
       - home-registry
 
+  # application services - [application - subnet]
+  application-redis:
+    image: redislabs/redismod
+    ports:
+      - "6379:6379"
+    networks:
+      - home-application
+
+  application-web:
+    build:
+      context: ./application
+    # flask requires SIGINT to stop gracefully
+    # (default stop signal from Compose is SIGTERM)
+    stop_signal: SIGINT
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./application:/code
+    depends_on:
+      - application-redis
+    networks:
+      - home-application
+
 networks:
   home-registry:
+  home-application:
