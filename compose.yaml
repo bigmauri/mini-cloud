@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  
+  # registry services - [home-registry - subnet]
+  registry-ui:
+    image: joxit/docker-registry-ui:main
+    restart: always
+    ports:
+      - 80:80
+    environment:
+      - SINGLE_REGISTRY=true
+      - REGISTRY_TITLE=Home Docker Registry UI
+      - DELETE_IMAGES=true
+      - SHOW_CONTENT_DIGEST=true
+      - NGINX_PROXY_PASS_URL=http://registry-server:5000
+      - SHOW_CATALOG_NB_TAGS=true
+      - CATALOG_MIN_BRANCHES=1
+      - CATALOG_MAX_BRANCHES=1
+      - TAGLIST_PAGE_SIZE=100
+      - REGISTRY_SECURED=true
+      - CATALOG_ELEMENTS_LIMIT=1000
+    container_name: registry-ui
+    networks:
+      - home-registry
+  registry-server:
+    image: registry:2.8.2
+    restart: always
+    environment:
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin: '[http://registry.example.com]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods: '[HEAD,GET,OPTIONS,DELETE]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Credentials: '[true]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Headers: '[Authorization,Accept,Cache-Control]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers: '[Docker-Content-Digest]'
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+    ports:
+      - 5000:5000
+    volumes:
+      - ./registry/data:/var/lib/registry
+    container_name: registry-server
+    networks:
+      - home-registry
+
+  # application services - [application - subnet]
+  application-redis:
+    image: redislabs/redismod
+    ports:
+      - "6379:6379"
+    networks:
+      - home-application
+
+  application-web:
+    build:
+      context: ./application
+    # flask requires SIGINT to stop gracefully
+    # (default stop signal from Compose is SIGTERM)
+    stop_signal: SIGINT
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./application:/code
+    depends_on:
+      - application-redis
+    networks:
+      - home-application
+
+networks:
+  home-registry:
+  home-application:
