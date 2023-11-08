@@ -1,5 +1,9 @@
 version: '3.8'
 
+volumes:
+  prometheus_data:
+  grafana_storage:
+
 services:
   
   # registry services - [home-registry - subnet]
@@ -7,7 +11,7 @@ services:
     image: joxit/docker-registry-ui:main
     restart: always
     ports:
-      - 80:80
+      - "8001:80"
     environment:
       - SINGLE_REGISTRY=true
       - REGISTRY_TITLE=Home Docker Registry UI
@@ -34,7 +38,7 @@ services:
       REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers: '[Docker-Content-Digest]'
       REGISTRY_STORAGE_DELETE_ENABLED: 'true'
     ports:
-      - 5000:5000
+      - "5000:5000"
     volumes:
       - ./registry/data:/var/lib/registry
     container_name: registry-server
@@ -48,7 +52,6 @@ services:
       - "6379:6379"
     networks:
       - home-application
-
   application-web:
     build:
       context: ./application
@@ -63,6 +66,80 @@ services:
       - application-redis
     networks:
       - home-application
+
+  # repository hosting service
+  gitlab:
+    image: gitlab/gitlab-ce:16.3.6-ce.0
+    restart: always
+    hostname: gitlab.home.com
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://gitlab.home.com:8929'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+    ports:
+      - "8929:8929"
+      - "2224:22"
+    volumes:
+      - './gitlab/config:/etc/gitlab'
+      - './gitlab/logs:/var/log/gitlab'
+      - './gitlab/data:/var/opt/gitlab'
+    shm_size: '256m'
+
+  # monitoring services
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./monitor/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    user: "104"
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - ./monitor/grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./monitor/grafana/config.monitoring
+    restart: always
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    command: 
+      - '--path.procfs=/host/proc' 
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    ports:
+      - "9100:9100"
+    restart: always
+
+  cadvisor:
+    image: google/cadvisor
+    container_name: cadvisor
+    volumes:
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
+    restart: always
 
 networks:
   home-registry:
